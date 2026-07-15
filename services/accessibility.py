@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+from utils.scoring import rating_for_score, ACCESSIBILITY_THRESHOLDS
 
 
 def analyze_accessibility(html):
@@ -10,6 +11,7 @@ def analyze_accessibility(html):
 
     score = 100
     findings = []
+    deductions = []
 
     # =========================
     # Page Title
@@ -22,6 +24,12 @@ def analyze_accessibility(html):
     else:
         findings.append("Missing page title.")
         score -= 15
+        deductions.append({
+            "id": "missing_title",
+            "label": "Missing page title",
+            "points": 15,
+            "category": "accessibility"
+        })
 
     # =========================
     # Images
@@ -43,6 +51,12 @@ def analyze_accessibility(html):
             f"{missing_alt} image(s) missing alt text."
         )
         score -= min(missing_alt * 2, 20)
+        deductions.append({
+            "id": "missing_image_alt",
+            "label": f"{missing_alt} image(s) missing alt text",
+            "points": min(missing_alt * 2, 20),
+            "category": "accessibility"
+        })
     else:
         findings.append("All images have alt text.")
 
@@ -94,6 +108,12 @@ def analyze_accessibility(html):
         )
 
         score -= min(unlabeled_inputs * 2, 20)
+        deductions.append({
+            "id": "unlabeled_inputs",
+            "label": f"{unlabeled_inputs} input field(s) missing labels",
+            "points": min(unlabeled_inputs * 2, 20),
+            "category": "accessibility"
+        })
 
     else:
 
@@ -119,6 +139,12 @@ def analyze_accessibility(html):
         )
 
         score -= min(empty_buttons * 5, 15)
+        deductions.append({
+            "id": "empty_buttons",
+            "label": f"{empty_buttons} empty button(s) detected",
+            "points": min(empty_buttons * 5, 15),
+            "category": "accessibility"
+        })
 
     else:
 
@@ -137,6 +163,12 @@ def analyze_accessibility(html):
         )
 
         score -= 10
+        deductions.append({
+            "id": "missing_headings",
+            "label": "No heading structure found",
+            "points": 10,
+            "category": "accessibility"
+        })
 
     else:
 
@@ -149,15 +181,7 @@ def analyze_accessibility(html):
     # =========================
 
     score = max(score, 0)
-
-    if score >= 85:
-        level = "Excellent"
-
-    elif score >= 65:
-        level = "Needs Improvement"
-
-    else:
-        level = "Poor"
+    level = rating_for_score(score, ACCESSIBILITY_THRESHOLDS)
 
     return {
 
@@ -173,6 +197,8 @@ def analyze_accessibility(html):
 
         "headings": len(headings),
 
-        "findings": findings
+        "findings": findings,
+
+        "deductions": deductions
 
     }

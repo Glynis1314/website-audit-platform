@@ -1,4 +1,5 @@
 from datetime import datetime
+from utils.scoring import compute_overall_grade
 
 def generate_report(
     scan_data,
@@ -28,18 +29,7 @@ def generate_report(
         1
     )
 
-    if overall_score >= 90:
-        grade = "A"
-        status = "Excellent"
-    elif overall_score >= 80:
-        grade = "B"
-        status = "Good"
-    elif overall_score >= 70:
-        grade = "C"
-        status = "Average"
-    else:
-        grade = "D"
-        status = "Needs Improvement"
+    grade, status = compute_overall_grade(overall_score)
 
     # =========================
     # Recommendations compilation

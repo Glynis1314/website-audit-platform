@@ -24,7 +24,7 @@ def check_link_status(url, timeout=4):
         # Treat status codes >= 400 as broken, except occasionally 403 (if cloudflare blocks scripts)
         is_broken = status_code >= 400
         return url, status_code, is_broken
-    except (requests.exceptions.RequestException, ValueError) as e:
+    except (requests.exceptions.RequestException, ValueError):
         return url, 0, True
 
 def audit_links(html, base_url, max_workers=10):
@@ -36,7 +36,6 @@ def audit_links(html, base_url, max_workers=10):
     anchors = soup.find_all("a", href=True)
     
     unique_links = set()
-    links_data = []
     
     for a in anchors:
         href = a["href"].strip()

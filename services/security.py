@@ -17,11 +17,11 @@ The public function :func:`analyze_security` returns a JSON‑serialisable dicti
 
 import socket
 import ssl
-import requests
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from utils.url_safety import is_safe_public_url, safe_request
+from utils.scoring import rating_for_score, SECURITY_THRESHOLDS
 
 def check_ssl_expiry(url):
     """
@@ -88,6 +88,7 @@ def check_security_headers(url):
     headers_found = {}
     missing_headers = []
     score_deduction = 0
+    header_deductions = []
     
     try:
         # Try HEAD request first for speed, fallback to GET
@@ -104,15 +105,27 @@ def check_security_headers(url):
                 headers_found[header_name] = None
                 missing_headers.append(header_name)
                 score_deduction += 6  # 6 points deduction per missing header
+                header_deductions.append({
+                    "id": f"missing_header_{header_name.lower()}",
+                    "label": f"Missing security header: {header_name}",
+                    "points": 6,
+                    "category": "security"
+                })
                 
-    except Exception as e:
+    except Exception:
         # If connection fails, treat all as missing or return connection failure
         for header_name in headers_to_check:
             headers_found[header_name] = None
+            header_deductions.append({
+                "id": f"missing_header_{header_name.lower()}",
+                "label": f"Missing security header: {header_name}",
+                "points": 4,  # 4 * 5 = 20 total flat deduction
+                "category": "security"
+            })
         missing_headers = list(headers_to_check.keys())
         score_deduction = 20  # Flat 20 deduction for network header scanning issues
         
-    return headers_found, missing_headers, score_deduction
+    return headers_found, missing_headers, score_deduction, header_deductions
 
 def analyze_security(html, url):
     """
@@ -121,6 +134,7 @@ def analyze_security(html, url):
     soup = BeautifulSoup(html, "lxml")
     score = 100
     findings = []
+    deductions = []
 
     # 1. HTTPS Check
     if url.startswith("https://"):
@@ -130,6 +144,12 @@ def analyze_security(html, url):
         https = False
         findings.append("Insecure HTTP protocol is used (HTTPS is not enabled).")
         score -= 20
+        deductions.append({
+            "id": "insecure_scheme",
+            "label": "Insecure HTTP protocol is used (HTTPS is not enabled)",
+            "points": 20,
+            "category": "security"
+        })
 
     # 2. SSL Expiry Check
     ssl_result = check_ssl_expiry(url)
@@ -140,13 +160,27 @@ def analyze_security(html, url):
             if days < 30:
                 score -= 5
                 findings.append("Warning: SSL certificate expires in less than 30 days.")
+                deductions.append({
+                    "id": "ssl_expiry_soon",
+                    "label": "SSL certificate expires in less than 30 days",
+                    "points": 5,
+                    "category": "security"
+                })
         else:
             score -= 15
-            findings.append(f"SSL Certificate Error: {ssl_result.get('error', 'Invalid SSL status.')}")
+            err_msg = ssl_result.get('error', 'Invalid SSL status.')
+            findings.append(f"SSL Certificate Error: {err_msg}")
+            deductions.append({
+                "id": "ssl_invalid_or_expired",
+                "label": f"SSL Certificate Error: {err_msg}",
+                "points": 15,
+                "category": "security"
+            })
 
     # 3. HTTP Security Headers Check
-    headers_found, missing_headers, header_deduction = check_security_headers(url)
+    headers_found, missing_headers, header_deduction, header_deductions = check_security_headers(url)
     score -= header_deduction
+    deductions.extend(header_deductions)
     
     if not missing_headers:
         findings.append("All core security headers are correctly configured.")
@@ -184,10 +218,28 @@ def analyze_security(html, url):
 
     if external_forms > 0:
         findings.append(f"Security concern: {external_forms} form(s) post data to external domains.")
+        deductions.append({
+            "id": "external_form_actions",
+            "label": f"Security concern: {external_forms} form(s) post data to external domains",
+            "points": 5 * external_forms,
+            "category": "security"
+        })
     if autocomplete_enabled > 0:
         findings.append(f"Security concern: Autocomplete is enabled on {autocomplete_enabled} password field(s).")
+        deductions.append({
+            "id": "password_autocomplete_enabled",
+            "label": f"Security concern: Autocomplete is enabled on {autocomplete_enabled} password field(s)",
+            "points": 5 * autocomplete_enabled,
+            "category": "security"
+        })
     if insecure_forms > 0:
         findings.append(f"Security risk: {insecure_forms} form(s) use insecure 'http://' actions.")
+        deductions.append({
+            "id": "insecure_form_actions",
+            "label": f"Security risk: {insecure_forms} form(s) use insecure 'http://' actions",
+            "points": 10 * insecure_forms,
+            "category": "security"
+        })
 
     # 5. Content Security Policy Meta Tag Check
     csp_meta = soup.find("meta", attrs={"http-equiv": "Content-Security-Policy"})
@@ -198,16 +250,16 @@ def analyze_security(html, url):
     else:
         findings.append("No Content Security Policy (CSP) found in headers or meta tags.")
         score -= 5
+        deductions.append({
+            "id": "missing_csp",
+            "label": "No Content Security Policy (CSP) found in headers or meta tags",
+            "points": 5,
+            "category": "security"
+        })
 
     # Final Score Limits
     score = max(score, 0)
-
-    if score >= 90:
-        level = "Good"
-    elif score >= 60:
-        level = "Moderate"
-    else:
-        level = "Poor"
+    level = rating_for_score(score, SECURITY_THRESHOLDS)
 
     return {
         "security_score": score,
@@ -220,5 +272,6 @@ def analyze_security(html, url):
         "autocomplete_enabled": autocomplete_enabled,
         "external_forms": external_forms,
         "insecure_forms": insecure_forms,
-        "findings": findings
+        "findings": findings,
+        "deductions": deductions
     }

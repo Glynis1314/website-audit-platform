@@ -1,7 +1,6 @@
 import streamlit as st
 from utils.db import get_aggregate_stats, init_db
 from components.sidebar import render_sidebar
-from services.scanner import scan_website
 
 # Initialize DB on application startup
 try:

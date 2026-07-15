@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 from html import escape
 from components.sidebar import render_sidebar
+from utils.impact_simulator import simulate_fixes
 
 from services.scanner import scan_website
 from services.form_analyzer import analyze_forms
@@ -189,8 +190,10 @@ if "scan_saved" not in st.session_state or st.session_state.get("scan_saved_url"
 
 # Score helper
 def score_badge(score, thresholds=(85, 65, 45)):
-    if score >= thresholds[0]: return "badge-green"
-    if score >= thresholds[1]: return "badge-amber"
+    if score >= thresholds[0]:
+        return "badge-green"
+    if score >= thresholds[1]:
+        return "badge-amber"
     return "badge-red"
 
 # =====================================================
@@ -312,13 +315,14 @@ st.divider()
 # =====================================================
 # Tabbed Breakdown Sections
 # =====================================================
-tab_sec, tab_acc, tab_perf, tab_seo, tab_forms, tab_links = st.tabs([
+tab_sec, tab_acc, tab_perf, tab_seo, tab_forms, tab_links, tab_sim = st.tabs([
     "🔒 Security & SSL",
     "♿ Accessibility",
     "⚡ Performance & Timings",
     "🔍 SEO & Social Info",
     "📝 Form Intelligence",
-    "🔗 Link Audit"
+    "🔗 Link Audit",
+    "🧪 Fix Impact Simulator"
 ])
 
 # ── 1. Security & SSL Tab
@@ -486,6 +490,108 @@ with tab_links:
         st.dataframe(pd.DataFrame(links_info["broken_links"]), use_container_width=True)
     else:
         st.success("✅ Clean Link Audit: No broken links detected among the scanned URLs.")
+
+# ── 7. Fix Impact Simulator Tab
+with tab_sim:
+    all_deductions = []
+    for cat in ["security", "accessibility", "performance", "seo"]:
+        for d in report.get(cat, {}).get("deductions", []):
+            all_deductions.append(d)
+            
+    all_deductions.sort(key=lambda x: x["points"], reverse=True)
+    
+    if "fixed_ids" not in st.session_state:
+        st.session_state["fixed_ids"] = set()
+        
+    st.markdown("### Hypothetical Fixes Prioritization List")
+    st.markdown("Check the issues you plan to address to preview the projected score impact:")
+    
+    sim_col1, sim_col2 = st.columns([3, 2])
+    
+    with sim_col1:
+        if not all_deductions:
+            st.success("No deductions detected! Your site scores 100% in all categories.")
+        else:
+            new_fixed_ids = set()
+            for d in all_deductions:
+                key = f"sim_{d['id']}_{d['category']}"
+                default_val = d["id"] in st.session_state["fixed_ids"]
+                checked = st.checkbox(
+                    label=f"{d['label']} (+{d['points']} pts)",
+                    value=default_val,
+                    key=key,
+                    help=f"Category: {d['category'].upper()} | ID: {d['id']}"
+                )
+                if checked:
+                    new_fixed_ids.add(d["id"])
+            st.session_state["fixed_ids"] = new_fixed_ids
+            
+    with sim_col2:
+        projected = simulate_fixes(report, st.session_state["fixed_ids"])
+        
+        st.markdown("### Score Projection Panel")
+        
+        # Display overall comparison card
+        st.markdown(f"""
+        <div class="sv-info-card" style="border-left: 4px solid var(--signal-cyan); text-align: center; margin-bottom: 24px;">
+            <div style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 8px;">Overall Performance</div>
+            <div style="display: flex; justify-content: center; align-items: baseline; gap: 16px;">
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted);">CURRENT</div>
+                    <div style="font-family: var(--font-mono); font-size: 32px; font-weight: 700; color: var(--text-muted);">{report['overall_score']}</div>
+                </div>
+                <div style="font-size: 24px; color: var(--text-muted);">➔</div>
+                <div>
+                    <div style="font-size: 11px; color: var(--signal-cyan);">PROJECTED</div>
+                    <div style="font-family: var(--font-mono); font-size: 42px; font-weight: 700; color: var(--signal-cyan);">{projected['overall_score']}</div>
+                </div>
+            </div>
+            <div style="margin-top: 8px; font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--signal-cyan);">
+                {projected['grade']} Grade · {projected['status']}
+            </div>
+            {f'<div style="margin-top: 12px; font-family: var(--font-mono); font-size: 13px; color: var(--signal-cyan);">+{round(projected["overall_score"] - report["overall_score"], 1)} points improvement</div>' if projected["overall_score"] > report["overall_score"] else ''}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Category projections
+        def render_comp_row(label, current_score, projected_score):
+            if projected_score >= 85:
+                color = "var(--signal-cyan)"
+            elif projected_score >= 65:
+                color = "var(--signal-amber)"
+            else:
+                color = "var(--signal-red)"
+                
+            delta_str = f"+{int(projected_score - current_score)}" if projected_score > current_score else "0"
+            delta_style = "color: var(--signal-cyan);" if projected_score > current_score else "color: var(--text-muted);"
+            
+            return f"""
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--grid-line); padding: 8px 0; font-family: var(--font-mono); font-size: 13px;">
+                <span style="font-family: var(--font-body); font-weight: 600; color: var(--text-primary);">{label}</span>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="color: var(--text-muted);">{int(current_score)}</span>
+                    <span style="color: var(--text-muted);">➔</span>
+                    <span style="font-weight: 700; color: {color};">{int(projected_score)}</span>
+                    <span style="font-size: 11px; {delta_style}">({delta_str})</span>
+                </div>
+            </div>
+            """
+            
+        st.markdown(f"""
+        <div class="sv-info-card">
+            <h4 style="margin-top: 0; color: var(--text-primary); font-family: var(--font-display);">Category Projections</h4>
+            {render_comp_row("Security", report['security']['security_score'], projected['security_score'])}
+            {render_comp_row("Accessibility", report['accessibility']['accessibility_score'], projected['accessibility_score'])}
+            {render_comp_row("Performance", report['performance']['performance_score'], projected['performance_score'])}
+            {render_comp_row("SEO Audit", report['seo']['seo_score'], projected['seo_score'])}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 16px; line-height: 1.4;">
+            Toggle fixes to see their impact on your score. This does not re-scan the site — check the boxes for issues you plan to fix, then re-run the audit after making changes to confirm.
+        </div>
+        """, unsafe_allow_html=True)
 
 st.divider()
 

@@ -104,7 +104,7 @@ def scan_website(url):
         if driver:
             try:
                 driver.quit()
-            except:
+            except Exception:
                 pass
         return {
             "success": False,

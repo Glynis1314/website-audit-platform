@@ -1,6 +1,5 @@
 import sqlite3
 import json
-import os
 from datetime import datetime
 
 DB_PATH = "siteverify.db"

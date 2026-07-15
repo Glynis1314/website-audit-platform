@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+from utils.scoring import rating_for_score, PERFORMANCE_THRESHOLDS
 
 def analyze_performance(html, timing_data=None):
     """
@@ -15,15 +16,28 @@ def analyze_performance(html, timing_data=None):
     html_size = len(html.encode("utf-8")) / 1024  # KB
     score = 100
     findings = []
+    deductions = []
     performance_metrics = {}
 
     # 1. HTML Size Audit
     if html_size > 1000:
         score -= 20
         findings.append(f"Large HTML document ({round(html_size, 1)} KB). Optimizing code and minification is recommended.")
+        deductions.append({
+            "id": "large_html_document",
+            "label": f"Large HTML document ({round(html_size, 1)} KB)",
+            "points": 20,
+            "category": "performance"
+        })
     elif html_size > 500:
         score -= 10
         findings.append(f"Moderately large HTML document ({round(html_size, 1)} KB).")
+        deductions.append({
+            "id": "large_html_document",
+            "label": f"Moderately large HTML document ({round(html_size, 1)} KB)",
+            "points": 10,
+            "category": "performance"
+        })
     else:
         findings.append(f"HTML size is efficient ({round(html_size, 1)} KB).")
 
@@ -39,6 +53,12 @@ def analyze_performance(html, timing_data=None):
     if len(scripts) > 30:
         score -= 10
         findings.append(f"High number of JavaScript resources ({len(scripts)} found: {external_js} external, {inline_js} inline).")
+        deductions.append({
+            "id": "javascript_bloat",
+            "label": f"High number of JavaScript resources ({len(scripts)} found)",
+            "points": 10,
+            "category": "performance"
+        })
     else:
         findings.append(f"JavaScript resource count is reasonable ({len(scripts)} found).")
 
@@ -50,6 +70,12 @@ def analyze_performance(html, timing_data=None):
     if total_css > 15:
         score -= 5
         findings.append(f"High number of CSS stylesheets ({total_css} detected: {external_css} external, {inline_css} inline).")
+        deductions.append({
+            "id": "css_bloat",
+            "label": f"High number of CSS stylesheets ({total_css} detected)",
+            "points": 5,
+            "category": "performance"
+        })
     else:
         findings.append(f"CSS stylesheet count is optimal ({total_css} detected).")
 
@@ -57,13 +83,17 @@ def analyze_performance(html, timing_data=None):
     if len(images) > 40:
         score -= 10
         findings.append(f"Large number of image assets ({len(images)}). Consider implementing lazy loading or modern formats like WebP.")
+        deductions.append({
+            "id": "excessive_images",
+            "label": f"Large number of image assets ({len(images)})",
+            "points": 10,
+            "category": "performance"
+        })
     else:
         findings.append(f"Image asset count is lightweight ({len(images)} images).")
 
     # 5. Timing Metrics from W3C API
     if timing_data and isinstance(timing_data, dict) and timing_data.get("navigationStart", 0) > 0:
-        nav_start = timing_data["navigationStart"]
-        
         # Calculate metric phases in milliseconds
         def get_delta(end_key, start_key):
             if timing_data.get(end_key, 0) > 0 and timing_data.get(start_key, 0) > 0:
@@ -98,9 +128,21 @@ def analyze_performance(html, timing_data=None):
         if ttfb > 1000:
             score -= 15
             findings.append(f"Critical TTFB (Time to First Byte) latency: {ttfb}ms. Suggests slow host response.")
+            deductions.append({
+                "id": "slow_ttfb",
+                "label": f"Critical TTFB (Time to First Byte) latency: {ttfb}ms",
+                "points": 15,
+                "category": "performance"
+            })
         elif ttfb > 400:
             score -= 5
             findings.append(f"Sub-optimal TTFB (Time to First Byte) latency: {ttfb}ms.")
+            deductions.append({
+                "id": "slow_ttfb",
+                "label": f"Sub-optimal TTFB (Time to First Byte) latency: {ttfb}ms",
+                "points": 5,
+                "category": "performance"
+            })
         else:
             findings.append(f"Excellent server response latency (TTFB: {ttfb}ms).")
 
@@ -108,9 +150,21 @@ def analyze_performance(html, timing_data=None):
         if page_load > 6000:
             score -= 20
             findings.append(f"Critical page load latency: {round(page_load / 1000, 2)}s. Recommended: < 3.0s.")
+            deductions.append({
+                "id": "slow_page_load",
+                "label": f"Critical page load latency: {round(page_load / 1000, 2)}s",
+                "points": 20,
+                "category": "performance"
+            })
         elif page_load > 3000:
             score -= 10
             findings.append(f"Slow page load latency: {round(page_load / 1000, 2)}s. Target is less than 3 seconds.")
+            deductions.append({
+                "id": "slow_page_load",
+                "label": f"Slow page load latency: {round(page_load / 1000, 2)}s",
+                "points": 10,
+                "category": "performance"
+            })
         else:
             findings.append(f"Page loaded rapidly in {round(page_load / 1000, 2)}s.")
 
@@ -118,6 +172,12 @@ def analyze_performance(html, timing_data=None):
         if dns_time > 200:
             score -= 5
             findings.append(f"Slightly slow DNS resolution time ({dns_time}ms).")
+            deductions.append({
+                "id": "slow_dns",
+                "label": f"Slightly slow DNS resolution time ({dns_time}ms)",
+                "points": 5,
+                "category": "performance"
+            })
     else:
         # Fallback or empty metrics
         performance_metrics = {
@@ -132,15 +192,7 @@ def analyze_performance(html, timing_data=None):
 
     # Clamp Score
     score = max(score, 0)
-
-    if score >= 85:
-        rating = "Excellent"
-    elif score >= 70:
-        rating = "Good"
-    elif score >= 50:
-        rating = "Average"
-    else:
-        rating = "Poor"
+    rating = rating_for_score(score, PERFORMANCE_THRESHOLDS)
 
     return {
         "performance_score": score,
@@ -156,5 +208,6 @@ def analyze_performance(html, timing_data=None):
         "inline_css": inline_css,
         "external_css": external_css,
         "metrics": performance_metrics,
-        "findings": findings
+        "findings": findings,
+        "deductions": deductions
     }

@@ -187,7 +187,7 @@ with right_col:
             try:
                 img = Image.open(scan_data["screenshot_path"])
                 st.image(img, width=None)
-            except:
+            except Exception:
                 st.markdown("*(Screenshot unavailable)*")
                 
             # Delete scan button
