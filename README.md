@@ -1,178 +1,48 @@
-# 🌐 website-audit-platform
+# SiteVerify
 
-An intelligent website auditing platform that automates website inspection using Selenium and Streamlit. SiteVerify analyzes website structure, forms, security, accessibility, and performance to generate comprehensive audit reports with downloadable PDFs.
-
----
-
-## 🚀 Features
-
-- 🌍 Website Scanning using Selenium
-- 📝 Form Intelligence Analysis
-- 🔒 Security Assessment
-- ♿ Accessibility Evaluation
-- ⚡ Performance Analysis
-- 📊 Overall Website Health Score
-- 📄 Professional PDF Report Generation
-- 📸 Automatic Website Screenshot Capture
-- 💡 Intelligent Recommendations
+**A comprehensive website audit platform** built to perform automated diagnostics on any domain. The solution parses SSL certificates, validates security headers, benchmarks page load performance, scans for accessibility/SEO issues, audits internal/external links, profiles forms, and generates professional PDF reports.
 
 ---
 
-## 🛠️ Tech Stack
+## Architecture & Workflow
 
-- Python
-- Streamlit
-- Selenium
-- BeautifulSoup
-- ReportLab
-- Pillow
-- WebDriver Manager
-
----
-
-## 📂 Project Structure
-
-```
-SiteVerify/
-│
-├── app.py
-├── requirements.txt
-├── README.md
-│
-├── services/
-│   ├── scanner.py
-│   ├── form_analyzer.py
-│   ├── security.py
-│   ├── accessibility.py
-│   └── performance.py
-│
-├── utils/
-│   ├── report_generator.py
-│   └── pdf_generator.py
-│
-├── screenshots/
-└── reports/
-```
+1. **Streamlit User Interface**: A modern multi-page web application using Streamlit.
+2. **Scanner Engine**: A synchronous Selenium-driven headless browser that loads target websites, waits for dynamic content, captures viewport screenshots, and extracts W3C performance timing parameters.
+3. **Diagnostic Analyzers**:
+   - **Security Analyzer**: Inspects HTTPS status, audits SSL certificate validity/expiration, checks for HTTP security response headers, and scans for insecure input forms.
+   - **Accessibility Analyzer**: Evaluates page title presence, image alternative tags, button content, heading hierarchy, and input control labels (including support for `aria-label` and `aria-labelledby`).
+   - **Performance Analyzer**: Analyzes page asset counts (scripts, style sheets, images), page size, and processes W3C navigation/resource timings (DNS lookup, TCP handshake, TTFB, and page load latency).
+   - **SEO Analyzer**: Reviews title length, meta description, viewport responsiveness configurations, canonical tags, open graph metadata, and heading structures.
+   - **Form Intelligence**: Profiles interactive forms, input elements, buttons, and flags potential security gaps (e.g. autocomplete on password fields).
+   - **Link Auditor**: Deterministically audits anchor links for broken or connection-failed URLs using a concurrent thread pool worker model.
+4. **SQLite Scan Database**: Persists scan history logs, overall scores, metadata, screenshot paths, and complete JSON reports.
+5. **PDF Report Compiler**: Compiles scan results into professional, executive-ready PDF reports available for direct download.
 
 ---
 
-## ⚙️ Installation
+## Getting Started
 
-Clone the repository:
+### Prerequisites
+
+- Python 3.10+
+- Google Chrome browser (for Selenium headless execution)
+
+### Installation & Run
 
 ```bash
-git clone https://github.com/Glynis1314/SiteVerify.git
-```
-
-Move into the project directory:
-
-```bash
+# Clone the repository
+git clone https://github.com/yourusername/SiteVerify.git
 cd SiteVerify
-```
 
-Create a virtual environment:
-
-```bash
-python -m venv venv
-```
-
-Activate the environment
-
-### Windows
-
-```bash
-venv\Scripts\activate
-```
-
-### Linux / macOS
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-Run the application:
-
-```bash
+# Run the Streamlit Application
 streamlit run app.py
 ```
 
 ---
 
-## 📊 Analysis Modules
+## License
 
-### 📝 Form Intelligence
-
-- Detects forms
-- Counts input fields
-- Detects email/password/search fields
-- Identifies hidden inputs
-
-### 🔒 Security
-
-- HTTPS verification
-- Password autocomplete detection
-- Security scoring
-- Security recommendations
-
-### ♿ Accessibility
-
-- Missing image alt attributes
-- Unlabelled form controls
-- Empty buttons
-- Accessibility score
-
-### ⚡ Performance
-
-- HTML size analysis
-- Images
-- JavaScript files
-- CSS stylesheets
-- Links
-- Performance score
-
----
-
-## 📄 Report Generation
-
-SiteVerify generates a downloadable PDF report containing:
-
-- Website Information
-- Overall Website Score
-- Form Analysis
-- Security Report
-- Accessibility Report
-- Performance Analysis
-- Recommendations
-
----
-
-## 🎯 Future Enhancements
-
-- Docker Support
-- Render Deployment
-- Lighthouse Integration
-- SEO Analysis
-- Broken Link Detection
-- Cookie Analysis
-- SSL Certificate Inspection
-- Responsive Design Testing
-
----
-
-## 👨‍💻 Author
-
-**Glynis D'Mello**
-
-GitHub: https://github.com/Glynis1314
-
----
-
-## ⭐ If you like this project
-
-Give it a ⭐ on GitHub!
+MIT © 2026 — Built with love for web audit and security automation.

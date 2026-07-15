@@ -59,19 +59,32 @@ def analyze_accessibility(html):
         if field.get("type") in ["hidden", "submit", "button"]:
             continue
 
+        has_label = False
         field_id = field.get("id")
 
+        # 1. Check <label for="...">
         if field_id:
+            label = soup.find("label", attrs={"for": field_id})
+            if label is not None:
+                has_label = True
 
-            label = soup.find(
-                "label",
-                attrs={"for": field_id}
-            )
+        # 2. Check aria-label
+        if not has_label:
+            aria_label = field.get("aria-label")
+            if aria_label and aria_label.strip():
+                has_label = True
 
-            if label is None:
-                unlabeled_inputs += 1
+        # 3. Check aria-labelledby
+        if not has_label:
+            aria_labelledby = field.get("aria-labelledby")
+            if aria_labelledby:
+                ref_ids = aria_labelledby.split()
+                for ref_id in ref_ids:
+                    if ref_id.strip() and soup.find(id=ref_id.strip()):
+                        has_label = True
+                        break
 
-        else:
+        if not has_label:
             unlabeled_inputs += 1
 
     if unlabeled_inputs > 0:
